@@ -21,157 +21,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
   final DateTime _selectedDay = dateOnly(DateTime.now());
 
   Future<void> _showCreateOrEditHabitDialog({HabitItem? existing}) async {
-    final titleController = TextEditingController(text: existing?.title ?? '');
-    var icon = existing?.icon ?? 'check';
-    var targetPerDay = existing?.targetPerDay ?? 1;
-    var period = existing?.dayPeriod ?? HabitDayPeriod.anytime;
-    final weekdays = {...(existing?.weekdays ?? const [1, 2, 3, 4, 5, 6, 7])};
-
-    final saved = await showDialog<bool>(
+    await showDialog<void>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(existing == null ? 'New habit' : 'Edit habit'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      key: const Key('habit-title-input'),
-                      controller: titleController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Habit name',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final choice in HabitIconChoice.values)
-                          ChoiceChip(
-                            label: Icon(choice.iconData, size: 16),
-                            selected: icon == choice.storageValue,
-                            onSelected: (_) =>
-                                setDialogState(() => icon = choice.storageValue),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        const Expanded(child: Text('Daily target')),
-                        IconButton(
-                          onPressed: targetPerDay > 1
-                              ? () => setDialogState(() => targetPerDay--)
-                              : null,
-                          icon: const Icon(Icons.remove, size: 18),
-                        ),
-                        Text(
-                          '$targetPerDay',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.merge(AppTheme.monoTextStyle),
-                        ),
-                        IconButton(
-                          onPressed: () => setDialogState(() => targetPerDay++),
-                          icon: const Icon(Icons.add, size: 18),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    DropdownButtonFormField<HabitDayPeriod>(
-                      initialValue: period,
-                      decoration: const InputDecoration(
-                        labelText: 'Time of day',
-                      ),
-                      items: [
-                        for (final p in HabitDayPeriod.values)
-                          DropdownMenuItem(value: p, child: Text(p.label)),
-                      ],
-                      onChanged: (v) {
-                        if (v != null) setDialogState(() => period = v);
-                      },
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        for (final entry in const [
-                          (1, 'M'),
-                          (2, 'T'),
-                          (3, 'W'),
-                          (4, 'T'),
-                          (5, 'F'),
-                          (6, 'S'),
-                          (7, 'S'),
-                        ])
-                          FilterChip(
-                            label: Text(entry.$2),
-                            selected: weekdays.contains(entry.$1),
-                            onSelected: (sel) {
-                              setDialogState(() {
-                                if (sel) {
-                                  weekdays.add(entry.$1);
-                                } else if (weekdays.length > 1) {
-                                  weekdays.remove(entry.$1);
-                                }
-                              });
-                            },
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  key: const Key('habit-save-button'),
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Save'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _HabitEditorDialog(existing: existing),
     );
-
-    final text = titleController.text.trim();
-    titleController.dispose();
-    if (saved == true && text.isNotEmpty && mounted) {
-      final store = context.read<HabitStore>();
-      final sortedDays = weekdays.toList()..sort();
-      if (existing == null) {
-        await store.createHabit(
-          title: text,
-          icon: icon,
-          targetPerDay: targetPerDay,
-          dayPeriod: period,
-          weekdays: sortedDays,
-        );
-      } else {
-        await store.updateHabit(
-          existing.copyWith(
-            title: text,
-            icon: icon,
-            targetPerDay: targetPerDay,
-            dayPeriod: period,
-            weekdays: sortedDays,
-          ),
-        );
-      }
-    }
   }
 
   @override
@@ -402,6 +255,177 @@ class _HabitCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _HabitEditorDialog extends StatefulWidget {
+  const _HabitEditorDialog({required this.existing});
+
+  final HabitItem? existing;
+
+  @override
+  State<_HabitEditorDialog> createState() => _HabitEditorDialogState();
+}
+
+class _HabitEditorDialogState extends State<_HabitEditorDialog> {
+  late final TextEditingController _titleController;
+  late String _icon;
+  late int _targetPerDay;
+  late HabitDayPeriod _period;
+  late Set<int> _weekdays;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _titleController = TextEditingController(text: existing?.title ?? '');
+    _icon = existing?.icon ?? 'check';
+    _targetPerDay = existing?.targetPerDay ?? 1;
+    _period = existing?.dayPeriod ?? HabitDayPeriod.anytime;
+    _weekdays = {...(existing?.weekdays ?? const [1, 2, 3, 4, 5, 6, 7])};
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.existing == null ? 'New habit' : 'Edit habit'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              key: const Key('habit-title-input'),
+              controller: _titleController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Habit name'),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final choice in HabitIconChoice.values)
+                  ChoiceChip(
+                    label: Icon(choice.iconData, size: 16),
+                    selected: _icon == choice.storageValue,
+                    onSelected: (_) =>
+                        setState(() => _icon = choice.storageValue),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                const Expanded(child: Text('Daily target')),
+                IconButton(
+                  onPressed: _targetPerDay > 1
+                      ? () => setState(() => _targetPerDay--)
+                      : null,
+                  icon: const Icon(Icons.remove, size: 18),
+                ),
+                Text(
+                  '$_targetPerDay',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.merge(AppTheme.monoTextStyle),
+                ),
+                IconButton(
+                  onPressed: () => setState(() => _targetPerDay++),
+                  icon: const Icon(Icons.add, size: 18),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<HabitDayPeriod>(
+              initialValue: _period,
+              decoration: const InputDecoration(labelText: 'Time of day'),
+              items: [
+                for (final p in HabitDayPeriod.values)
+                  DropdownMenuItem(value: p, child: Text(p.label)),
+              ],
+              onChanged: (v) {
+                if (v != null) setState(() => _period = v);
+              },
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                for (final entry in const [
+                  (1, 'M'),
+                  (2, 'T'),
+                  (3, 'W'),
+                  (4, 'T'),
+                  (5, 'F'),
+                  (6, 'S'),
+                  (7, 'S'),
+                ])
+                  FilterChip(
+                    label: Text(entry.$2),
+                    selected: _weekdays.contains(entry.$1),
+                    onSelected: (sel) {
+                      setState(() {
+                        if (sel) {
+                          _weekdays.add(entry.$1);
+                        } else if (_weekdays.length > 1) {
+                          _weekdays.remove(entry.$1);
+                        }
+                      });
+                    },
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const Key('habit-save-button'),
+          onPressed: () async {
+            final text = _titleController.text.trim();
+            if (text.isEmpty) return;
+            final store = context.read<HabitStore>();
+            final sortedDays = _weekdays.toList()..sort();
+            final existing = widget.existing;
+            if (existing == null) {
+              await store.createHabit(
+                title: text,
+                icon: _icon,
+                targetPerDay: _targetPerDay,
+                dayPeriod: _period,
+                weekdays: sortedDays,
+              );
+            } else {
+              await store.updateHabit(
+                existing.copyWith(
+                  title: text,
+                  icon: _icon,
+                  targetPerDay: _targetPerDay,
+                  dayPeriod: _period,
+                  weekdays: sortedDays,
+                ),
+              );
+            }
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: const Text('Save'),
+        ),
+      ],
     );
   }
 }

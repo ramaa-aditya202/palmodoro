@@ -25,179 +25,17 @@ class _ProjectsScreenState extends State<ProjectsScreen> {
   bool _showMapView = false;
 
   Future<void> _showCreateProjectDialog({String? parentId}) async {
-    final nameController = TextEditingController();
-    var selectedColor = ProjectColors.palette.first;
-    var selectedIcon = ProjectIcon.folder;
-
-    final created = await showDialog<bool>(
+    await showDialog<void>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: Text(parentId == null ? 'New project' : 'New sub-project'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    TextField(
-                      controller: nameController,
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        labelText: 'Project name',
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final hex in ProjectColors.palette)
-                          GestureDetector(
-                            onTap: () =>
-                                setDialogState(() => selectedColor = hex),
-                            child: Container(
-                              width: 28,
-                              height: 28,
-                              decoration: BoxDecoration(
-                                color: ProjectColors.parse(hex),
-                                shape: BoxShape.circle,
-                                border: selectedColor == hex
-                                    ? Border.all(
-                                        color: context.appColors.primaryText,
-                                        width: 2.2,
-                                      )
-                                    : null,
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final icon in ProjectIcon.values)
-                          ChoiceChip(
-                            label: Icon(icon.iconData, size: 16),
-                            selected: selectedIcon == icon,
-                            onSelected: (_) =>
-                                setDialogState(() => selectedIcon = icon),
-                          ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Create'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _CreateProjectDialog(parentId: parentId),
     );
-
-    final text = nameController.text.trim();
-    nameController.dispose();
-    if (created == true && text.isNotEmpty && mounted) {
-      await context.read<ProjectStore>().createProject(
-        name: text,
-        colorHex: selectedColor,
-        icon: selectedIcon,
-        parentId: parentId,
-      );
-    }
   }
 
   Future<void> _showCreateLabelDialog() async {
-    final nameController = TextEditingController();
-    var selectedColor = ProjectColors.palette.first;
-
-    final created = await showDialog<bool>(
+    await showDialog<void>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              title: const Text('New label'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: nameController,
-                    autofocus: true,
-                    decoration: const InputDecoration(labelText: 'Label name'),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      for (final hex in ProjectColors.palette)
-                        GestureDetector(
-                          onTap: () =>
-                              setDialogState(() => selectedColor = hex),
-                          child: Container(
-                            width: 28,
-                            height: 28,
-                            decoration: BoxDecoration(
-                              color: ProjectColors.parse(hex),
-                              shape: BoxShape.circle,
-                              border: selectedColor == hex
-                                  ? Border.all(
-                                      color: context.appColors.primaryText,
-                                      width: 2.2,
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                OutlinedButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Create'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => const _CreateLabelDialog(),
     );
-
-    final text = nameController.text.trim();
-    nameController.dispose();
-    if (created == true && text.isNotEmpty && mounted) {
-      try {
-        await context.read<ProjectStore>().createLabel(
-          name: text,
-          colorHex: selectedColor,
-        );
-      } on LabelNameTakenException catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text(e.toString())));
-        }
-      }
-    }
   }
 
   @override
@@ -576,6 +414,196 @@ class LabelDetailScreen extends StatelessWidget {
                     for (final task in tasks) TaskListItem(task: task),
                   ],
                 ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CreateProjectDialog extends StatefulWidget {
+  const _CreateProjectDialog({required this.parentId});
+
+  final String? parentId;
+
+  @override
+  State<_CreateProjectDialog> createState() => _CreateProjectDialogState();
+}
+
+class _CreateProjectDialogState extends State<_CreateProjectDialog> {
+  final TextEditingController _nameController = TextEditingController();
+  String _selectedColor = ProjectColors.palette.first;
+  ProjectIcon _selectedIcon = ProjectIcon.folder;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.parentId == null ? 'New project' : 'New sub-project'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Project name'),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final hex in ProjectColors.palette)
+                  GestureDetector(
+                    onTap: () => setState(() => _selectedColor = hex),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: ProjectColors.parse(hex),
+                        shape: BoxShape.circle,
+                        border: _selectedColor == hex
+                            ? Border.all(
+                                color: context.appColors.primaryText,
+                                width: 2.2,
+                              )
+                            : null,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final icon in ProjectIcon.values)
+                  ChoiceChip(
+                    label: Icon(icon.iconData, size: 16),
+                    selected: _selectedIcon == icon,
+                    onSelected: (_) => setState(() => _selectedIcon = icon),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final text = _nameController.text.trim();
+            if (text.isEmpty) return;
+            await context.read<ProjectStore>().createProject(
+              name: text,
+              colorHex: _selectedColor,
+              icon: _selectedIcon,
+              parentId: widget.parentId,
+            );
+            if (context.mounted) {
+              Navigator.of(context).pop();
+            }
+          },
+          child: const Text('Create'),
+        ),
+      ],
+    );
+  }
+}
+
+class _CreateLabelDialog extends StatefulWidget {
+  const _CreateLabelDialog();
+
+  @override
+  State<_CreateLabelDialog> createState() => _CreateLabelDialogState();
+}
+
+class _CreateLabelDialogState extends State<_CreateLabelDialog> {
+  final TextEditingController _nameController = TextEditingController();
+  String _selectedColor = ProjectColors.palette.first;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New label'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _nameController,
+            autofocus: true,
+            decoration: const InputDecoration(labelText: 'Label name'),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final hex in ProjectColors.palette)
+                GestureDetector(
+                  onTap: () => setState(() => _selectedColor = hex),
+                  child: Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: ProjectColors.parse(hex),
+                      shape: BoxShape.circle,
+                      border: _selectedColor == hex
+                          ? Border.all(
+                              color: context.appColors.primaryText,
+                              width: 2.2,
+                            )
+                          : null,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        OutlinedButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: () async {
+            final text = _nameController.text.trim();
+            if (text.isEmpty) return;
+            try {
+              await context.read<ProjectStore>().createLabel(
+                name: text,
+                colorHex: _selectedColor,
+              );
+              if (context.mounted) {
+                Navigator.of(context).pop();
+              }
+            } on LabelNameTakenException catch (e) {
+              if (context.mounted) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(
+                  context,
+                ).showSnackBar(SnackBar(content: Text(e.toString())));
+              }
+            }
+          },
+          child: const Text('Create'),
         ),
       ],
     );

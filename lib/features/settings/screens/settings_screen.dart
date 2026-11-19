@@ -408,85 +408,106 @@ class SettingsScreen extends StatelessWidget {
   Future<void> _showImportCsvDialog(BuildContext context) async {
     final taskStore = context.read<TaskStore>();
     final projectStore = context.read<ProjectStore>();
-    final controller = TextEditingController();
-    String? errorMessage;
-
-    await showDialog<void>(
+    final importedCount = await showDialog<int>(
       context: context,
-      builder: (dialogContext) {
-        return StatefulBuilder(
-          builder: (dialogContext, setDialogState) {
-            final colors = dialogContext.appColors;
-            return AlertDialog(
-              title: const Text('Import tasks from CSV'),
-              content: SizedBox(
-                width: 480,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      key: const Key('csv-import-text-field'),
-                      controller: controller,
-                      minLines: 4,
-                      maxLines: 8,
-                      style: const TextStyle(
-                        fontFamily: 'GeistMono',
-                        fontSize: 12,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Pomodoist CSV content',
-                        hintText: 'key,content,project,priority...',
-                      ),
-                    ),
-                    if (errorMessage != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        errorMessage!,
-                        key: const Key('csv-import-error-text'),
-                        style: TextStyle(color: colors.error, fontSize: 12),
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton.icon(
-                  key: const Key('csv-import-confirm-button'),
-                  onPressed: () async {
-                    try {
-                      final count = await CsvTaskService.importCsv(
-                        csvContent: controller.text,
-                        taskStore: taskStore,
-                        projectStore: projectStore,
-                      );
-                      if (dialogContext.mounted) {
-                        Navigator.of(dialogContext).pop();
-                      }
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text('Imported $count task(s) from CSV'),
-                          ),
-                        );
-                      }
-                    } on CsvImportFormatException catch (e) {
-                      setDialogState(() => errorMessage = e.message);
-                    }
-                  },
-                  icon: const Icon(LucideIcons.upload, size: 16),
-                  label: const Text('Import'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => _ImportCsvDialog(
+        taskStore: taskStore,
+        projectStore: projectStore,
+      ),
     );
-    controller.dispose();
+    if (importedCount != null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Imported $importedCount task(s) from CSV'),
+        ),
+      );
+    }
+  }
+}
+
+class _ImportCsvDialog extends StatefulWidget {
+  const _ImportCsvDialog({
+    required this.taskStore,
+    required this.projectStore,
+  });
+
+  final TaskStore taskStore;
+  final ProjectStore projectStore;
+
+  @override
+  State<_ImportCsvDialog> createState() => _ImportCsvDialogState();
+}
+
+class _ImportCsvDialogState extends State<_ImportCsvDialog> {
+  final TextEditingController _controller = TextEditingController();
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = context.appColors;
+    return AlertDialog(
+      title: const Text('Import tasks from CSV'),
+      content: SizedBox(
+        width: 480,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            TextField(
+              key: const Key('csv-import-text-field'),
+              controller: _controller,
+              minLines: 4,
+              maxLines: 8,
+              style: const TextStyle(fontFamily: 'GeistMono', fontSize: 12),
+              decoration: const InputDecoration(
+                labelText: 'Pomodoist CSV content',
+                hintText: 'key,content,project,priority...',
+              ),
+            ),
+            if (_errorMessage != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _errorMessage!,
+                key: const Key('csv-import-error-text'),
+                style: TextStyle(color: colors.error, fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton.icon(
+          key: const Key('csv-import-confirm-button'),
+          onPressed: () async {
+            try {
+              final count = await CsvTaskService.importCsv(
+                csvContent: _controller.text,
+                taskStore: widget.taskStore,
+                projectStore: widget.projectStore,
+              );
+              if (context.mounted) {
+                Navigator.of(context).pop(count);
+              }
+            } on CsvImportFormatException catch (e) {
+              if (mounted) {
+                setState(() => _errorMessage = e.message);
+              }
+            }
+          },
+          icon: const Icon(LucideIcons.upload, size: 16),
+          label: const Text('Import'),
+        ),
+      ],
+    );
   }
 }
